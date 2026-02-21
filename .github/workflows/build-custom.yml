@@ -37,23 +37,14 @@ jobs:
         id: check
         run: |
           UPSTREAM_TAG=$(curl -s https://api.github.com/repos/${{ env.UPSTREAM_REPO }}/releases/latest | jq -r '.tag_name')
-          echo "Upstream latest tag: $UPSTREAM_TAG"
-          
-          # Docker Hub 使用不带 v 前缀的版本号
           DOCKER_TAG="${UPSTREAM_TAG#v}"
-          echo "Docker tag: $DOCKER_TAG"
-          
           LAST_BUILT_TAG=$(cat .last-built-tag 2>/dev/null || echo "none")
-          echo "Last built tag: $LAST_BUILT_TAG"
           
           if [ "${{ github.event.inputs.force_build }}" == "true" ]; then
-            echo "Force build requested"
             echo "should_build=true" >> $GITHUB_OUTPUT
           elif [ "$UPSTREAM_TAG" != "$LAST_BUILT_TAG" ]; then
-            echo "New upstream release detected"
             echo "should_build=true" >> $GITHUB_OUTPUT
           else
-            echo "No new release"
             echo "should_build=false" >> $GITHUB_OUTPUT
           fi
           
@@ -85,17 +76,40 @@ jobs:
         with:
           version: 10
 
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
       - name: Apply custom styles
         run: |
+          # 将自定义 CSS 追加到 index.css
           cat custom/custom.css >> authelia/web/src/index.css
+          
+          # 复制自定义 Logo
           cp custom/logo.png authelia/web/public/logo.png
-          echo "Custom styles applied"
+          
+          echo "Custom styles applied to source"
 
       - name: Build web frontend
         working-directory: authelia/web
         run: |
           pnpm install --frozen-lockfile
           pnpm build
+
+      - name: Build Go binary with embedded frontend
+        working-directory: authelia
+        run: |
+          # 设置版本信息
+          VERSION=${{ needs.check-upstream.outputs.upstream_tag }}
+          BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          
+          # 构建 Authelia 二进制文件（前端会被嵌入）
+          CGO_ENABLED=0 go build -trimpath \
+            -ldflags "-s -w \
+              -X github.com/authelia/authelia/v4/internal/utils.BuildTag=${VERSION} \
+              -X github.com/authelia/authelia/v4/internal/utils.BuildDate=${BUILD_DATE}" \
+            -o authelia ./cmd/authelia
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -106,13 +120,32 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Create custom Dockerfile
+      - name: Create Dockerfile
         run: |
-          cat > Dockerfile << DOCKERFILE
-          FROM authelia/authelia:${{ needs.check-upstream.outputs.docker_tag }}
+          cat > Dockerfile << 'DOCKERFILE'
+          FROM alpine:3.21
           
-          # 覆盖前端文件
-          COPY authelia/internal/server/public_html/ /app/public_html/
+          RUN apk --no-cache add ca-certificates tzdata
+          
+          WORKDIR /app
+          
+          COPY authelia/authelia /app/authelia
+          COPY authelia/entrypoint.sh /entrypoint.sh
+          COPY authelia/healthcheck.sh /app/healthcheck.sh
+          
+          RUN chmod +x /app/authelia /entrypoint.sh /app/healthcheck.sh
+          
+          EXPOSE 9091
+          
+          ENV PATH="/app:${PATH}" \
+              PUID=0 \
+              PGID=0 \
+              X_AUTHELIA_CONFIG="/config/configuration.yml"
+          
+          ENTRYPOINT ["/entrypoint.sh"]
+          CMD ["authelia"]
+          
+          HEALTHCHECK --interval=30s --timeout=3s --start-period=1s CMD /app/healthcheck.sh
           DOCKERFILE
 
       - name: Build and push Docker image
@@ -124,7 +157,7 @@ jobs:
           tags: |
             ${{ env.DOCKER_IMAGE }}:${{ needs.check-upstream.outputs.docker_tag }}
             ${{ env.DOCKER_IMAGE }}:latest
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
 
       - name: Update last built tag
         run: |
