@@ -76,12 +76,12 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+        uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 10
 
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -90,7 +90,7 @@ jobs:
 
       - name: Apply custom styles
         run: |
-          # 复制自定义 CSS
+          # 复制自定义 CSS 到 index.css 末尾
           cat custom/custom.css >> authelia/web/src/index.css
           
           # 复制自定义 Logo
@@ -101,13 +101,8 @@ jobs:
       - name: Build web frontend
         working-directory: authelia/web
         run: |
-          pnpm install
+          pnpm install --frozen-lockfile
           pnpm build
-
-      - name: Build Authelia binary
-        working-directory: authelia
-        run: |
-          go build -o authelia ./cmd/authelia
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -137,13 +132,3 @@ jobs:
           git add .last-built-tag
           git commit -m "Update last built tag to ${{ needs.check-upstream.outputs.upstream_tag }}" || true
           git push || true
-
-  deploy:
-    needs: [check-upstream, build]
-    if: needs.check-upstream.outputs.should_build == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy notification
-        run: |
-          echo "New Authelia custom build deployed: ${{ needs.check-upstream.outputs.upstream_tag }}"
-          # 这里可以添加通知或自动部署到服务器的逻辑
