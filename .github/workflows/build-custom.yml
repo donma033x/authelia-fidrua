@@ -1,0 +1,149 @@
+name: Build Custom Authelia
+
+on:
+  schedule:
+    # 每天检查上游更新
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      force_build:
+        description: 'Force rebuild even if no upstream changes'
+        required: false
+        default: 'false'
+  push:
+    branches:
+      - main
+    paths:
+      - 'custom/**'
+      - '.github/workflows/build-custom.yml'
+
+env:
+  UPSTREAM_REPO: authelia/authelia
+  DOCKER_IMAGE: donma033x/authelia-fidrua
+
+jobs:
+  check-upstream:
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.check.outputs.should_build }}
+      upstream_tag: ${{ steps.check.outputs.upstream_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check upstream for new releases
+        id: check
+        run: |
+          # 获取上游最新 release tag
+          UPSTREAM_TAG=$(curl -s https://api.github.com/repos/${{ env.UPSTREAM_REPO }}/releases/latest | jq -r '.tag_name')
+          echo "Upstream latest tag: $UPSTREAM_TAG"
+          
+          # 获取我们上次构建的 tag
+          LAST_BUILT_TAG=$(cat .last-built-tag 2>/dev/null || echo "none")
+          echo "Last built tag: $LAST_BUILT_TAG"
+          
+          # 判断是否需要构建
+          if [ "${{ github.event.inputs.force_build }}" == "true" ]; then
+            echo "Force build requested"
+            echo "should_build=true" >> $GITHUB_OUTPUT
+          elif [ "$UPSTREAM_TAG" != "$LAST_BUILT_TAG" ]; then
+            echo "New upstream release detected"
+            echo "should_build=true" >> $GITHUB_OUTPUT
+          else
+            echo "No new release"
+            echo "should_build=false" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "upstream_tag=$UPSTREAM_TAG" >> $GITHUB_OUTPUT
+
+  build:
+    needs: check-upstream
+    if: needs.check-upstream.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout our repo
+        uses: actions/checkout@v4
+
+      - name: Checkout upstream Authelia
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.UPSTREAM_REPO }}
+          ref: ${{ needs.check-upstream.outputs.upstream_tag }}
+          path: authelia
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Apply custom styles
+        run: |
+          # 复制自定义 CSS
+          cat custom/custom.css >> authelia/web/src/index.css
+          
+          # 复制自定义 Logo
+          cp custom/logo.png authelia/web/public/logo.png
+          
+          echo "Custom styles applied"
+
+      - name: Build web frontend
+        working-directory: authelia/web
+        run: |
+          pnpm install
+          pnpm build
+
+      - name: Build Authelia binary
+        working-directory: authelia
+        run: |
+          go build -o authelia ./cmd/authelia
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: authelia
+          file: authelia/Dockerfile
+          push: true
+          tags: |
+            ${{ env.DOCKER_IMAGE }}:${{ needs.check-upstream.outputs.upstream_tag }}
+            ${{ env.DOCKER_IMAGE }}:latest
+          platforms: linux/amd64,linux/arm64
+
+      - name: Update last built tag
+        run: |
+          echo "${{ needs.check-upstream.outputs.upstream_tag }}" > .last-built-tag
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add .last-built-tag
+          git commit -m "Update last built tag to ${{ needs.check-upstream.outputs.upstream_tag }}" || true
+          git push || true
+
+  deploy:
+    needs: [check-upstream, build]
+    if: needs.check-upstream.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy notification
+        run: |
+          echo "New Authelia custom build deployed: ${{ needs.check-upstream.outputs.upstream_tag }}"
+          # 这里可以添加通知或自动部署到服务器的逻辑
