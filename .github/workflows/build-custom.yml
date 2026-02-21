@@ -26,6 +26,7 @@ jobs:
     outputs:
       should_build: ${{ steps.check.outputs.should_build }}
       upstream_tag: ${{ steps.check.outputs.upstream_tag }}
+      docker_tag: ${{ steps.check.outputs.docker_tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,6 +38,10 @@ jobs:
         run: |
           UPSTREAM_TAG=$(curl -s https://api.github.com/repos/${{ env.UPSTREAM_REPO }}/releases/latest | jq -r '.tag_name')
           echo "Upstream latest tag: $UPSTREAM_TAG"
+          
+          # Docker Hub 使用不带 v 前缀的版本号
+          DOCKER_TAG="${UPSTREAM_TAG#v}"
+          echo "Docker tag: $DOCKER_TAG"
           
           LAST_BUILT_TAG=$(cat .last-built-tag 2>/dev/null || echo "none")
           echo "Last built tag: $LAST_BUILT_TAG"
@@ -53,6 +58,7 @@ jobs:
           fi
           
           echo "upstream_tag=$UPSTREAM_TAG" >> $GITHUB_OUTPUT
+          echo "docker_tag=$DOCKER_TAG" >> $GITHUB_OUTPUT
 
   build:
     needs: check-upstream
@@ -102,8 +108,8 @@ jobs:
 
       - name: Create custom Dockerfile
         run: |
-          cat > Dockerfile << 'DOCKERFILE'
-          FROM authelia/authelia:${{ needs.check-upstream.outputs.upstream_tag }}
+          cat > Dockerfile << DOCKERFILE
+          FROM authelia/authelia:${{ needs.check-upstream.outputs.docker_tag }}
           
           # 覆盖前端文件
           COPY authelia/internal/server/public_html/ /app/public_html/
@@ -116,7 +122,7 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: |
-            ${{ env.DOCKER_IMAGE }}:${{ needs.check-upstream.outputs.upstream_tag }}
+            ${{ env.DOCKER_IMAGE }}:${{ needs.check-upstream.outputs.docker_tag }}
             ${{ env.DOCKER_IMAGE }}:latest
           platforms: linux/amd64,linux/arm64
 
