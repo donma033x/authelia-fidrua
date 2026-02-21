@@ -1,0 +1,274 @@
+/* ========================================
+   Fidrua 科技感登录页 - 毛玻璃 + 流体光效
+   ======================================== */
+
+/* 全局背景 */
+body {
+    background: linear-gradient(135deg, #0a0f1c 0%, #1a1f3c 50%, #0a0f1c 100%) !important;
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+/* 动态光团背景 */
+body::before,
+body::after {
+    content: '';
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(80px);
+    z-index: 0;
+    opacity: 0.6;
+    animation: floatBlob 20s ease-in-out infinite;
+    pointer-events: none;
+}
+
+body::before {
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(6, 182, 212, 0.7) 0%, transparent 70%);
+    top: -150px;
+    left: -100px;
+}
+
+body::after {
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, rgba(139, 92, 246, 0.7) 0%, transparent 70%);
+    bottom: -100px;
+    right: -50px;
+    animation-delay: -10s;
+}
+
+@keyframes floatBlob {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    25% { transform: translate(80px, 40px) scale(1.1); }
+    50% { transform: translate(40px, 80px) scale(0.9); }
+    75% { transform: translate(-40px, 40px) scale(1.05); }
+}
+
+/* 第三个光团 - 通过 #root 伪元素 */
+#root::before {
+    content: '';
+    position: fixed;
+    width: 300px;
+    height: 300px;
+    background: radial-gradient(circle, rgba(236, 72, 153, 0.5) 0%, transparent 70%);
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    filter: blur(80px);
+    z-index: 0;
+    animation: pulseGlow 8s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes pulseGlow {
+    0%, 100% { opacity: 0.3; transform: translate(-50%, -50%) scale(1); }
+    50% { opacity: 0.6; transform: translate(-50%, -50%) scale(1.3); }
+}
+
+/* 毛玻璃卡片 */
+.MuiPaper-root {
+    background: rgba(15, 23, 42, 0.6) !important;
+    backdrop-filter: blur(24px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 24px !important;
+    box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.6),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+    position: relative;
+    z-index: 10;
+    overflow: visible !important;
+}
+
+/* 渐变边框动画 */
+.MuiPaper-root::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    background: linear-gradient(135deg, #06b6d4, #8b5cf6, #ec4899, #06b6d4);
+    background-size: 300% 300%;
+    border-radius: 26px;
+    z-index: -1;
+    opacity: 0.5;
+    animation: borderShift 6s ease infinite;
+}
+
+@keyframes borderShift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+/* 标题渐变 */
+.MuiTypography-h4,
+.MuiTypography-h5,
+.MuiTypography-h6 {
+    background: linear-gradient(135deg, #06b6d4 0%, #a78bfa 50%, #ec4899 100%) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    background-clip: text !important;
+    font-weight: 700 !important;
+}
+
+/* 文字颜色 */
+.MuiTypography-root,
+.MuiTypography-body1,
+.MuiTypography-body2,
+.MuiInputBase-input,
+.MuiFormLabel-root,
+.MuiInputLabel-root {
+    color: rgba(255, 255, 255, 0.9) !important;
+}
+
+/* 输入框 */
+.MuiOutlinedInput-root {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border-radius: 12px !important;
+    transition: all 0.3s ease !important;
+}
+
+.MuiOutlinedInput-root:hover {
+    background: rgba(255, 255, 255, 0.12) !important;
+}
+
+.MuiOutlinedInput-root.Mui-focused {
+    background: rgba(255, 255, 255, 0.12) !important;
+}
+
+.MuiOutlinedInput-notchedOutline {
+    border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+    border-color: rgba(255, 255, 255, 0.3) !important;
+}
+
+.MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+    border-color: #06b6d4 !important;
+    box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.2) !important;
+}
+
+/* 按钮 */
+.MuiButton-containedPrimary {
+    background: linear-gradient(135deg, #06b6d4 0%, #8b5cf6 100%) !important;
+    border: none !important;
+    border-radius: 12px !important;
+    font-weight: 600 !important;
+    text-transform: none !important;
+    padding: 12px 24px !important;
+    box-shadow: 
+        0 4px 15px rgba(6, 182, 212, 0.4),
+        0 0 30px rgba(139, 92, 246, 0.2) !important;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease !important;
+}
+
+.MuiButton-containedPrimary:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 
+        0 8px 25px rgba(6, 182, 212, 0.5),
+        0 0 40px rgba(139, 92, 246, 0.4) !important;
+}
+
+/* 链接 */
+.MuiLink-root,
+a {
+    color: #06b6d4 !important;
+    text-decoration: none !important;
+    transition: all 0.3s ease;
+}
+
+.MuiLink-root:hover,
+a:hover {
+    color: #8b5cf6 !important;
+    text-shadow: 0 0 10px rgba(139, 92, 246, 0.5);
+}
+
+/* 顶部栏透明 */
+.MuiAppBar-root,
+header {
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+/* 复选框 */
+.MuiCheckbox-root {
+    color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.MuiCheckbox-root.Mui-checked {
+    color: #06b6d4 !important;
+}
+
+/* Logo 容器 */
+.MuiAvatar-root,
+img[alt*="logo" i],
+img[alt*="Logo" i] {
+    filter: drop-shadow(0 4px 20px rgba(6, 182, 212, 0.4));
+    border-radius: 0 !important;
+    background: transparent !important;
+}
+
+/* 错误提示 */
+.MuiAlert-standardError {
+    background: rgba(239, 68, 68, 0.2) !important;
+    border: 1px solid rgba(239, 68, 68, 0.3) !important;
+    border-radius: 12px !important;
+}
+
+/* 成功提示 */
+.MuiAlert-standardSuccess {
+    background: rgba(34, 197, 94, 0.2) !important;
+    border: 1px solid rgba(34, 197, 94, 0.3) !important;
+    border-radius: 12px !important;
+}
+
+/* 警告提示 */
+.MuiAlert-standardWarning {
+    background: rgba(234, 179, 8, 0.2) !important;
+    border: 1px solid rgba(234, 179, 8, 0.3) !important;
+    border-radius: 12px !important;
+}
+
+/* 信息提示 */
+.MuiAlert-standardInfo {
+    background: rgba(6, 182, 212, 0.2) !important;
+    border: 1px solid rgba(6, 182, 212, 0.3) !important;
+    border-radius: 12px !important;
+}
+
+/* 图标按钮 */
+.MuiIconButton-root {
+    color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.MuiIconButton-root:hover {
+    color: #06b6d4 !important;
+    background: rgba(6, 182, 212, 0.1) !important;
+}
+
+/* 分割线 */
+.MuiDivider-root {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* 响应式 */
+@media (max-width: 600px) {
+    body::before,
+    body::after {
+        width: 250px;
+        height: 250px;
+    }
+    
+    #root::before {
+        width: 200px;
+        height: 200px;
+    }
+    
+    .MuiPaper-root {
+        margin: 16px !important;
+        border-radius: 20px !important;
+    }
+}
