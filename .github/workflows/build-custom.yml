@@ -83,12 +83,8 @@ jobs:
 
       - name: Apply custom styles
         run: |
-          # 将自定义 CSS 追加到 index.css
           cat custom/custom.css >> authelia/web/src/index.css
-          
-          # 复制自定义 Logo
           cp custom/logo.png authelia/web/public/logo.png
-          
           echo "Custom styles applied to source"
 
       - name: Build web frontend
@@ -100,11 +96,9 @@ jobs:
       - name: Build Go binary with embedded frontend
         working-directory: authelia
         run: |
-          # 设置版本信息
           VERSION=${{ needs.check-upstream.outputs.upstream_tag }}
           BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           
-          # 构建 Authelia 二进制文件（前端会被嵌入）
           CGO_ENABLED=0 go build -trimpath \
             -ldflags "-s -w \
               -X github.com/authelia/authelia/v4/internal/utils.BuildTag=${VERSION} \
@@ -125,27 +119,23 @@ jobs:
           cat > Dockerfile << 'DOCKERFILE'
           FROM alpine:3.21
           
-          RUN apk --no-cache add ca-certificates tzdata
+          RUN apk --no-cache add ca-certificates tzdata su-exec
           
           WORKDIR /app
           
           COPY authelia/authelia /app/authelia
-          COPY authelia/entrypoint.sh /entrypoint.sh
-          COPY authelia/healthcheck.sh /app/healthcheck.sh
           
-          RUN chmod +x /app/authelia /entrypoint.sh /app/healthcheck.sh
+          RUN chmod +x /app/authelia
           
           EXPOSE 9091
           
           ENV PATH="/app:${PATH}" \
-              PUID=0 \
-              PGID=0 \
               X_AUTHELIA_CONFIG="/config/configuration.yml"
           
-          ENTRYPOINT ["/entrypoint.sh"]
-          CMD ["authelia"]
+          ENTRYPOINT ["/app/authelia"]
+          CMD ["--config", "/config/configuration.yml"]
           
-          HEALTHCHECK --interval=30s --timeout=3s --start-period=1s CMD /app/healthcheck.sh
+          HEALTHCHECK --interval=30s --timeout=3s --start-period=1s CMD /app/authelia healthcheck
           DOCKERFILE
 
       - name: Build and push Docker image
