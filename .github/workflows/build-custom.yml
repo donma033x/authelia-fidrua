@@ -2,7 +2,6 @@ name: Build Custom Authelia
 
 on:
   schedule:
-    # 每天检查上游更新
     - cron: '0 6 * * *'
   workflow_dispatch:
     inputs:
@@ -36,15 +35,12 @@ jobs:
       - name: Check upstream for new releases
         id: check
         run: |
-          # 获取上游最新 release tag
           UPSTREAM_TAG=$(curl -s https://api.github.com/repos/${{ env.UPSTREAM_REPO }}/releases/latest | jq -r '.tag_name')
           echo "Upstream latest tag: $UPSTREAM_TAG"
           
-          # 获取我们上次构建的 tag
           LAST_BUILT_TAG=$(cat .last-built-tag 2>/dev/null || echo "none")
           echo "Last built tag: $LAST_BUILT_TAG"
           
-          # 判断是否需要构建
           if [ "${{ github.event.inputs.force_build }}" == "true" ]; then
             echo "Force build requested"
             echo "should_build=true" >> $GITHUB_OUTPUT
@@ -83,19 +79,10 @@ jobs:
         with:
           version: 10
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.24'
-
       - name: Apply custom styles
         run: |
-          # 复制自定义 CSS 到 index.css 末尾
           cat custom/custom.css >> authelia/web/src/index.css
-          
-          # 复制自定义 Logo
           cp custom/logo.png authelia/web/public/logo.png
-          
           echo "Custom styles applied"
 
       - name: Build web frontend
@@ -113,11 +100,20 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Create custom Dockerfile
+        run: |
+          cat > Dockerfile << 'DOCKERFILE'
+          FROM authelia/authelia:${{ needs.check-upstream.outputs.upstream_tag }}
+          
+          # 覆盖前端文件
+          COPY authelia/internal/server/public_html/ /app/public_html/
+          DOCKERFILE
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: authelia
-          file: authelia/Dockerfile
+          context: .
+          file: ./Dockerfile
           push: true
           tags: |
             ${{ env.DOCKER_IMAGE }}:${{ needs.check-upstream.outputs.upstream_tag }}
